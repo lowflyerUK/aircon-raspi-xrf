@@ -1,0 +1,16 @@
+## modify this file as needed and save as /home/pi/cron.example then run "crontab /home/pi/cron.example"
+
+MAILTO=""
+# ------------- minute (0 - 59)
+# | ----------- hour (0 - 23)
+# | | --------- day of month (1 - 31)
+# | | | ------- month (1 - 12)
+# | | | | ----- day of week (0 - 6) (Sunday=0)
+# | | | | |
+# * * * * * command to be executed
+
+00	22	*	*	*	touch /run/shm/ask_ac_heat
+00	23	*	*	*	touch /run/shm/ask_ac_off
+
+00      17      *       *       *       touch /run/shm/ask_av_heat                                 
+30      21      *       *       *       touch /run/shm/ask_av_off

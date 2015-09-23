@@ -1,5 +1,5 @@
-# python code running all the time on Raspberry Pi. Records sensors to /home/pi/temp_hum_1.csv
-# and listens for commands for a/c in /run/shm
+# python code running all the time on Raspberry Pi. Records sensors to /home/pi/temp.csv
+# and listens for commands for a/c in /run/shm/
 
 # needs access to /dev/ttyAMA0 so:
 # 1. Either run as root (not recommended), or add the user to the group 'dialout' - try 'sudo usermod -a -G dialout pi'
@@ -19,7 +19,7 @@
 #      T||     temperature 00 -> 29
 #     |        a auto, d dehumidify, c cool, v ventillate, h heat
 #    |         1 on, 0 off
-#   |          C chambre, V salle � vivre, T request temperature
+#   |          C bedroom, V lounge, T request temperature
 # aA           start
 
 # aAV1cT24F320 switch on cooling 24deg Fan 3 swing side/side normal
@@ -40,20 +40,15 @@ print "Opening port "+ port + " at ", baud, " baud."
 ser = serial.Serial(port, baud)
 # Clear out anything in the read buffer
 ser.flushInput()
-voltage = float(0.0)
+
 llapMsg = ''
 new_data = False
-temperature = float(0.0)
-humidity = float(0.0)
+
 tempTE = float(0.0)
 battTE = float(0.0)
+
 tempTF = float(0.0)
 battTF = float(0.0)
-
-tempTP = float(0.0)
-batt1TP = float(0.0)
-humTP = float(0.0)
-batt2TP = float(0.0)
 
 tempAC = float(0.0)
 
@@ -80,18 +75,11 @@ code_AV_COOL_ON = 'aAV1cT22FA00'
 code_AV_OFF = 'aAV0cT24F320'
 
 ##Thermistor to temperature constants.
-# 19/3/2015 with 3380, 10000: (digital, thermistor) gave (6.12, 6.34) (6.06, 6.55)(6.18, 6.65)
-# 22/3/2015 (5.00, 5.3) (4.81, 5.4) (5.00, 5.51)
-beta = 3380             # beta value for the thermistor - should be 3380 was 3330
+beta = 3380             # beta value for the thermistor
 Rzero = 273.15
 Rtemp = 25.0 + Rzero   # reference temperature (25C)
 Rresi = 10000           # reference resistance at reference temperature - adjust to calibrate was 10300
 Rnom = 10000     #nominal resistance of thermistor at Rtemp
-
-RH_C1 = 157.232 #strange constants for correcting humidity sensor readings
-RH_C2 = 0.1515  #Can't remember where I found these, but 009024-2-EN.pdf gives similar numbers
-RH_C3 = 1.0546
-RH_C4 = 0.00216
 
 while 1 :
         time_NOW = time.time()
@@ -153,33 +141,6 @@ while 1 :
 
                     llapMsg = llapMsg[found_a + 12:]
 
-                found_a = llapMsg.find('aTP')
-                if (found_a != -1 and len(llapMsg) > found_a + 11) :
-                    newMsg = llapMsg[found_a:found_a + 12]
-                    if newMsg.startswith('aTPD'):
-                          try :
-                              Rtherm = float(Rresi / (1024.0/int(newMsg[4:8],16) -1) )
-                              tempTP = Rtemp * beta / (beta + Rtemp * (log(Rtherm/Rnom))) - Rzero
-                              temperature = tempTP
-                              humTP = (( float(int(newMsg[8:12],16)) /1024 - RH_C2) * RH_C1)/(RH_C3 - RH_C4 * tempTP)
-                              humidity = humTP
-                              print 'got ' + newMsg + ' from TP data: ' + str(round(tempTP,2)) + ' deg ' + str(round(humTP,2)) + '%'
-                              new_data = True
-                          except :
-                              print 'Got ValueError in data from TP' + str(sys.exc_info()[0] )
-
-                    if newMsg.startswith('aTPB'):
-                          try :
-                              batt1TP = float( 1.22 * 1024 / int(newMsg[4:8],16) )
-                              batt2TP = float( 1.22 * 1024 / int(newMsg[8:12],16) )
-                              voltage = batt2TP
-                              print 'got ' + newMsg + ' from TP battery: ' + str(round(batt1TP,2)) + ' ' + str(round(batt2TP,2))
-                              new_data = True
-                          except :
-                              print 'Got ValueError in battTP'
-
-                    llapMsg = llapMsg[found_a + 12:]
-
                 found_a = llapMsg.find('aA')
                 if (found_a != -1 and len(llapMsg) > found_a + 11) :
                     newMsg = llapMsg[found_a:found_a + 12]
@@ -203,8 +164,8 @@ while 1 :
                     llapMsg = llapMsg[found_a + 12:]
 
         if new_data :
-            with open('/home/pi/temp_hum_1.csv' , 'w') as csv_file:
-                 s = str(round(temperature,2)) + str(',') + str(round(humidity,2))+ str(',') + str(round(voltage,2)) + str(',') + str(round(temperature,1)) + str(',') + str(round(humidity,1)) + str(',') + str(round(tempTE,2)) + str(',') + str(round(battTE,2)) + str(',') + str(round(tempTF,2)) + str(',') + str(round(battTF,2)) + str(',') + str(round(tempAC,2)) + str('\r\n')
+            with open('/home/pi/temp.csv' , 'w') as csv_file:
+                 s = str(round(tempTE,2)) + str(',') + str(round(battTE,2)) + str(',') + str(round(tempTF,2)) + str(',') + str(round(battTF,2)) + str(',') + str(round(tempAC,2)) + str('\r\n')
                  csv_file.write(s)
             new_data = False
 
@@ -307,5 +268,3 @@ while 1 :
                 time.sleep(0.1)
         else :
                 time.sleep(0.02)
-
-
