@@ -17,7 +17,7 @@
 #           |  0 no swing, 1 swing up/down, 2 swing side/side, 3 swing both
 #         F|   Fan 1-5, A auto, N night
 #      T||     temperature 00 -> 29
-#     |        a auto, d dehumidify, c cool, v ventillate, h heat
+#     |        A auto, D dehumidify, C cool, V ventillate, H heat
 #    |         1 on, 0 off
 #   |          C bedroom, V lounge, T request temperature
 # aA           start
@@ -67,12 +67,12 @@ ask_AV_HEAT = '/run/shm/ask_av_heat'
 ask_AV_COOL = '/run/shm/ask_av_cool'
 ask_AV_OFF = '/run/shm/ask_av_off'
 
-code_AC_HEAT_ON = 'aAC1hT17FA00'
-code_AC_COOL_ON = 'aAC1cT22FA00'
-code_AC_OFF = 'aAC0cT24F320'
-code_AV_HEAT_ON = 'aAV1hT17FA00'
-code_AV_COOL_ON = 'aAV1cT22FA00'
-code_AV_OFF = 'aAV0cT24F320'
+code_AC_HEAT_ON = 'aAC1HT17FA00'
+code_AC_COOL_ON = 'aAC1CT22FA00'
+code_AC_OFF = 'aAC0CT24F320'
+code_AV_HEAT_ON = 'aAV1HT17FA00'
+code_AV_COOL_ON = 'aAV1CT22FA00'
+code_AV_OFF = 'aAV0CT24F320'
 
 ##Thermistor to temperature constants.
 beta = 3380             # beta value for the thermistor

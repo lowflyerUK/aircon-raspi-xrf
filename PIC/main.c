@@ -6,9 +6,9 @@
  *           |  0 no swing, 1 swing up/down, 2 swing side/side, 3 swing both
  *         F|   Fan 1-5, A auto, N night
  *      T||     temperature 00 -> 29
- *     |        a auto, d dehumidify, c cool, v ventillate, h heat
+ *     |        A auto, D dehumidify, C cool, V ventillate, H heat
  *    |         1 on, 0 off
- *   |          C chambre, V salle à vivre, T request temperature
+ *   |          C chambre, V salle a vivre, T request temperature
  * aA           start
 
  * aAV1cT24F320 switch on cooling 24deg Fan 3 swing side/side normal
@@ -26,7 +26,7 @@
 pins used:
  * AN4 (pin 7) input. Analog from thermistor. 10kohms to power.
  *
- * RC0 (pin 11) PWM output to salle à vivre - aAV. Needs external pull-down resistor, say 1k, 2nF => 2usec
+ * RC0 (pin 11) PWM output to salle a vivre - aAV. Needs external pull-down resistor, say 1k, 2nF => 2usec
  * RC1 (pin 12) PWM output to chambre - aVC
 
  *******************************************************************/
@@ -43,7 +43,7 @@ pins used:
 #define _XTAL_FREQ 8000000
 
 #define MY_CODE_1 'A' // Air conditioning
-#define MY_CODE_2_1 'V' // salle à Vivre
+#define MY_CODE_2_1 'V' // salle a Vivre
 #define MY_CODE_2_2 'C' // Chambre
 
 //************Configuration in program*****************************
@@ -245,26 +245,26 @@ void main(void) {
                     }
 
                     switch (in_buf[i + 4]) {
-                        case 'a': //automatic mode
+                        case 'A': //automatic mode
                             block3[13] = block3[13] & 0x0F;
                             FLAGbits.Bits.to_do = 1;
                             break;
-                        case 'd': //dehumidify mode
+                        case 'D': //dehumidify mode
                             block3[5] = (block3[5] & 0xDF); // quiet mode off
                             block3[10] = (block3[10] & 0x0F) + 0xA0; //auto fan
                             // and lots of bits
                             FLAGbits.Bits.to_do = 1;
                             break;
-                        case 'c': //cool mode
+                        case 'C': //cool mode
                             block3[13] = (block3[13] & 0x0F) | 0x30;
                             FLAGbits.Bits.to_do = 1;
                             break;
-                        case 'v': //ventilation mode
+                        case 'V': //ventilation mode
                             block3[13] = (block3[13] & 0x0F) | 0x60;
                             // and temp to 25
                             FLAGbits.Bits.to_do = 1;
                             break;
-                        case 'h': //heat mode
+                        case 'H': //heat mode
                             block3[13] = (block3[13] & 0x0F) | 0x40;
                             FLAGbits.Bits.to_do = 1;
                             break;
@@ -297,7 +297,7 @@ void main(void) {
 
             OpenTimer2(TIMER_INT_OFF & T2_PS_1_1 & T2_POST_1_1);
             SetOutputPWM1(SINGLE_OUT, PWM_MODE_1);
-            SetDCPWM1(75); // first guess was 20. 75 gives aobut 9us on time
+            SetDCPWM1(75); // first guess was 20. 75 gives about 9us on time.
             OpenPWM1(55); // 38KHz = 26.3microsec = 52+1 instruction cycles. 55 gives 28us
             di();
             send_preamble();
@@ -309,9 +309,9 @@ void main(void) {
             TRISCbits.TRISC0 = 1;
             TRISCbits.TRISC1 = 1;
         }
-        
+
         Delay1KTCYx(30); //15ms delay to let another packet arrive
-        
+
         if (FLAGbits.Bits.send_temp) {
             // send the temperature
             FLAGbits.Bits.send_temp = 0;
