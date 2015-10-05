@@ -13,12 +13,12 @@ P_SEPARATOR2 = int(34900)
 
 parser = argparse.ArgumentParser(description='Test script to convert lirc raw files from Daikin a/c')
 parser.add_argument('-i','--input', help='Input file name',required=True)
-parser.add_argument('-c','--command',help='command string aXY1cT20F100', required=True)
+parser.add_argument('-c','--command',help='command string aXY1CT20F100', required=True)
 args = parser.parse_args()
 
 if (len(args.command) != 12):
    print('command is wrong length')
-   my_command = 'aXY1cT20F100'
+   my_command = 'aXY1CT20F100'
 else:
    my_command =args.command
 
@@ -84,7 +84,7 @@ print('\n')
 
 print(my_command)
 
-#example command aXY1cT20F100
+#example command aXY1CT20F100
 if (my_command[3] == '1'):
   # on
   in_first.overwrite('0b1', 111)
@@ -156,22 +156,22 @@ if (my_command[11] == '1'):
   #quiet
   in_first.overwrite('0b1', 42)
 
-if (my_command[4] == 'a'):
+if (my_command[4] == 'A'):
   #auto mode
   in_first.overwrite('0b00000', 103)
-if (my_command[4] == 'd'):
+if (my_command[4] == 'D'):
   #auto dehum also needs #quiet off and auto_fan
   in_first.overwrite('0b0', 42)
   in_first.overwrite('0b1010', 80)
   in_first.overwrite('0b1100000000101', 96)
-if (my_command[4] == 'c'):
+if (my_command[4] == 'C'):
   #auto cool
   in_first.overwrite('0b00011', 103)
-if (my_command[4] == 'v'):
+if (my_command[4] == 'V'):
   #auto vent also forces temp to 25
   in_first.overwrite('0b00110', 103)
   in_first.overwrite('0b11001', 98)
-if (my_command[4] == 'h'):
+if (my_command[4] == 'H'):
   #auto heat
   in_first.overwrite('0b00100', 103)
 
