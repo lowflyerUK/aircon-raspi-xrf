@@ -12,7 +12,7 @@
 # data to XRF:   XRF pin 3 to RasPi P1-08
 # data from XRF: XRF pin 2 to RasPi P1-010
 
-# aAC0cT24F320 - off
+# aAC0CT24F320 - off
 #            | 1 quiet, 0 normal
 #           |  0 no swing, 1 swing up/down, 2 swing side/side, 3 swing both
 #         F|   Fan 1-5, A auto, N night
@@ -22,7 +22,7 @@
 #   |          C bedroom, V lounge, T request temperature
 # aA           start
 
-# aAV1cT24F320 switch on cooling 24deg Fan 3 swing side/side normal
+# aAV1CT24F320 switch on cooling 24deg Fan 3 swing side/side normal
 # aACT-------- request temperature
 
 import time
