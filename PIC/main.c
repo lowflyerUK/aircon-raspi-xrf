@@ -1,7 +1,7 @@
 /* Daikin Air Conditioning remote.
  * Listens for commands in format like https://www.wirelessthings.net/wireless-temperature-sensor#lot
 
- * aAC0cT24F320 - off
+ * aAC0CT24F320 - off
  *            | 1 quiet, 0 normal
  *           |  0 no swing, 1 swing up/down, 2 swing side/side, 3 swing both
  *         F|   Fan 1-5, A auto, N night
@@ -11,7 +11,7 @@
  *   |          C chambre, V salle a vivre, T request temperature
  * aA           start
 
- * aAV1cT24F320 switch on cooling 24deg Fan 3 swing side/side normal
+ * aAV1CT24F320 switch on cooling 24deg Fan 3 swing side/side normal
  * aACT-------- request temperature
 
  * responds with aACACK------ or aAVACK------ or aACDwxyzwxyz where wxyz is analog measured voltage across thermistor in hex
@@ -79,17 +79,11 @@ char block3[19] = {0xf4, 0x00, 0x80, 0xc1, 0x00, 0x20, 0x60, 0x06,
 
 char in_buf[120];
 unsigned char in_buf_ptr = 0x00;
-unsigned char timer0_count = 0x00;
 
 struct FLAGBITS {
     // unsigned lock : 1;
     unsigned send_temp : 1;
-    unsigned got_int0 : 1;
-    unsigned to_do_here : 1;
-    unsigned to_do : 1;
-    unsigned need_to_send : 1;
-    unsigned need_to_ack : 1;
-    unsigned waiting_for_ack : 1;
+    unsigned good_cmd : 1; // 1 if all bits of the air-con command are valid, 0 if any invalid
     unsigned output_RC0 : 1; // 1 if using RC0, 0 if using RC1
 };
 
@@ -101,13 +95,18 @@ typedef union {
 volatile FLAGS FLAGbits;
 
 void interrupt ISR(void) {
+    int j;
     //Check if we received something in the USART
     if (RC1IE && RC1IF) {
         in_buf[in_buf_ptr] = Read1USART();
         if (in_buf_ptr < 100) {
             in_buf_ptr++;
         } else {
-            in_buf_ptr = 0x00;
+            //shift the buffer along if is getting full - save the last 12 characters received just to be safe.
+            for (j = 0; j < 12; j++) {
+                in_buf[j] = in_buf[j + in_buf_ptr - 11];
+            }
+            in_buf_ptr = 12;
         }
 
         if (RCSTA1bits.OERR) { //clear any overrun
@@ -123,7 +122,7 @@ void main(void) {
     unsigned int ac_temp = 0;
     char send_str[12] = "aPO---------";
     char ack_str[12] = "aPOACK------";
-    unsigned char i, j;
+    unsigned char i, j, msg_start;
     send_str[1] = MY_CODE_1;
     send_str[2] = MY_CODE_2_1;
     ack_str[1] = MY_CODE_1;
@@ -136,12 +135,15 @@ void main(void) {
     ei();
 
     while (1) {
-
+        FLAGbits.Bits.good_cmd = 0;
+        FLAGbits.Bits.send_temp = 0;
+        msg_start = 0;
         if (in_buf_ptr > 11) { //we have received enough bytes for a message
             di();
-            for (i = 0; i < 60; i++) {
+            for (i = 0; i < in_buf_ptr - 11; i++) {
                 if (in_buf[i] == 'a' && in_buf[i + 1] == MY_CODE_1 && (in_buf[i + 2] == MY_CODE_2_1 || in_buf[i + 2] == MY_CODE_2_2)) {
-                    //we got a message for us - first choose if RC0 or RC1
+                    msg_start = i; // save for later
+                    //we got enough bytes for a full message for us - first choose if RC0 or RC1
                     if (in_buf[i + 2] == MY_CODE_2_1) {
                         ack_str[2] = MY_CODE_2_1;
                         FLAGbits.Bits.output_RC0 = 1;
@@ -149,61 +151,61 @@ void main(void) {
                         ack_str[2] = MY_CODE_2_2;
                         FLAGbits.Bits.output_RC0 = 0;
                     }
-                    if (in_buf[i + 3] == '1') {
-                        //switch on
-                        block3[13] = block3[13] | 0x01;
-                        FLAGbits.Bits.to_do = 1;
+
+                    //now decide what command we got
+                    FLAGbits.Bits.good_cmd = 1; // if any part is invalid, this will be changed
+                    switch (in_buf[i + 3]) {
+                        case '1': //switch on
+                            block3[13] = block3[13] | 0x01;
+                            break;
+                        case '0': //switch off
+                            block3[13] = block3[13] & 0xFE;
+                            break;
+                        case 'T': //send temperature reading
+                            FLAGbits.Bits.send_temp = 1;
+                            FLAGbits.Bits.good_cmd = 0; //not an air-con command
+                            break;
+                        default:
+                            FLAGbits.Bits.good_cmd = 0; //invalid if it wasn't '0' or '1'
+                            break;
                     }
-                    if (in_buf[i + 3] == '0') {
-                        //switch off
-                        block3[13] = block3[13] & 0xFE;
-                        FLAGbits.Bits.to_do = 1;
-                    }
-                    if (in_buf[i + 3] == 'T') {
-                        //send temperature reading
-                        FLAGbits.Bits.send_temp = 1;
-                    }
-                    //note mode done at end as it need to overwrite sometimes
+
+                    //note mode done at end as it needs to overwrite sometimes
                     if (((in_buf[i + 6] & 0xFC) == 0x30) && ((in_buf[i + 7] & 0xF0) == 0x30) && ((in_buf[i + 7] & 0x0F) < 10)) {
 
                         ac_temp = 10 * (in_buf[i + 6] & 0x0F) + (in_buf[i + 7] & 0x0F);
                         //get temp from buf 6 & 7; test it is between 0 & 31; update
                         block3[12] = ac_temp << 1;
-                        FLAGbits.Bits.to_do = 1;
+                    } else {
+                        FLAGbits.Bits.good_cmd = 0; // invalid temperature
                     }
 
                     switch (in_buf[i + 9]) {
                             // fan options
                         case '1': //fan1
                             block3[10] = (block3[10] & 0x0F) | 0x30;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '2': //fan2
                             block3[10] = (block3[10] & 0x0F) | 0x40;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '3': //fan3
                             block3[10] = (block3[10] & 0x0F) + 0x50;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '4': //fan4
                             block3[10] = (block3[10] & 0x0F) + 0x60;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '5': //fan5
                             block3[10] = (block3[10] & 0x0F) + 0x70;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'A': //fan auto
                             block3[10] = (block3[10] & 0x0F) + 0xA0;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'N': //fan night
                             block3[10] = (block3[10] & 0x0F) + 0xB0;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         default:
                             // do nothing
+                            FLAGbits.Bits.good_cmd = 0; // invalid fan command
                             break;
                     }
                     switch (in_buf[i + 10]) {
@@ -211,80 +213,73 @@ void main(void) {
                         case '0': //no swing
                             block3[10] = (block3[10] & 0xF0);
                             block3[9] = (block3[9] & 0xF0);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '1': //swing up & down
                             block3[10] = (block3[10] | 0x0F);
                             block3[9] = (block3[9] & 0xF0);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '2': //swing side to side
                             block3[10] = (block3[10] & 0xF0);
                             block3[9] = (block3[9] | 0x0F);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '3': //both swing up & side
                             block3[10] = (block3[10] | 0x0F);
                             block3[9] = (block3[9] | 0x0F);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         default:
+                            FLAGbits.Bits.good_cmd = 0; // invalid swing command
                             break;
                     }
                     switch (in_buf[i + 11]) {
                         case '0': //quiet mode off
                             block3[5] = (block3[5] & 0xDF);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case '1': //quiet mode on
                             block3[5] = (block3[5] | 0x20);
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         default:
+                            FLAGbits.Bits.good_cmd = 0; // invalid quiet mode
                             break;
                     }
 
                     switch (in_buf[i + 4]) {
                         case 'A': //automatic mode
                             block3[13] = block3[13] & 0x0F;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'D': //dehumidify mode
                             block3[5] = (block3[5] & 0xDF); // quiet mode off
                             block3[10] = (block3[10] & 0x0F) + 0xA0; //auto fan
                             // and lots of bits
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'C': //cool mode
                             block3[13] = (block3[13] & 0x0F) | 0x30;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'V': //ventilation mode
                             block3[13] = (block3[13] & 0x0F) | 0x60;
                             // and temp to 25
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         case 'H': //heat mode
                             block3[13] = (block3[13] & 0x0F) | 0x40;
-                            FLAGbits.Bits.to_do = 1;
                             break;
                         default:
+                            FLAGbits.Bits.good_cmd = 0; // invalid mode
                             break;
                     }
-                    //reset in_buf ready for next packet
-                    for (j = 0; j < 120; j++) {
-                        in_buf[j] = 0x00;
+                    //discard used characters
+                    for (j = 0; j < in_buf_ptr - (msg_start + 12); j++) {
+                        in_buf[j] = in_buf[j + msg_start + 12];
                     }
-                    in_buf_ptr = 0x00;
-                    break;
+                    in_buf_ptr = in_buf_ptr - (msg_start + 12);
+
+                    break; // Only process one match. If there is another in the buffer it will be processed next time.
                 } //end of if aXY statement
-            }
+            } // end of for loop
             ei();
         }//end of (in_buf_ptr > 11)
 
-        //test to see if anything changed??
-        if (FLAGbits.Bits.to_do) {
-            FLAGbits.Bits.to_do = 0;
+        //test to see if we got a valid air-con command
+        if (FLAGbits.Bits.good_cmd) {
+            FLAGbits.Bits.good_cmd = 0; // in fact don't need to do it here as it is done at the start of the while loop
             //send ack
             di();
             for (j = 0; j < 12; j++) {
@@ -314,7 +309,7 @@ void main(void) {
 
         if (FLAGbits.Bits.send_temp) {
             // send the temperature
-            FLAGbits.Bits.send_temp = 0;
+            FLAGbits.Bits.send_temp = 0; // in fact don't need to do it here as it is done at the start of the while loop
             di();
             temperature = get_temp();
             while (Busy1USART());
